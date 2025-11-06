@@ -1,35 +1,88 @@
-import { Table, Column, Model, DataType } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, BelongsTo, ForeignKey } from 'sequelize-typescript';
 
-@Table({ tableName: 'products' })
+export enum ProductCategory {
+  WATCHES = 'watches',
+  SHOES = 'shoes',
+}
+
+export enum ProductStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  OUT_OF_STOCK = 'out_of_stock',
+}
+
+@Table({
+  tableName: 'products',
+  timestamps: true,
+  paranoid: true,
+})
 export class Product extends Model<Product> {
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: false,
+  })
+  name: string;
+
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+  })
+  description: string | null;
+
+  @Column({
+    type: DataType.DECIMAL(10, 2),
+    allowNull: false,
+  })
+  price: number;
+
   @Column({
     type: DataType.INTEGER,
-    autoIncrement: true,
-    primaryKey: true,
+    allowNull: false,
+    defaultValue: 0,
   })
-  declare id: number;
+  stock: number;
+
+  @Column({
+    type: DataType.ENUM(...Object.values(ProductCategory)),
+    allowNull: false,
+  })
+  category: ProductCategory;
+
+  @Column({
+    type: DataType.ENUM(...Object.values(ProductStatus)),
+    allowNull: false,
+    defaultValue: ProductStatus.ACTIVE,
+  })
+  status: ProductStatus;
+
+  @Column({
+    type: DataType.JSONB,
+    allowNull: true,
+  })
+  images: string[] | null;
+
+  @Column({
+    type: DataType.JSONB,
+    allowNull: true,
+  })
+  specifications: Record<string, any> | null;
 
   @Column({
     type: DataType.STRING,
-    allowNull: false,
+    allowNull: true,
   })
-  declare name: string;
-
-  @Column(DataType.TEXT)
-  declare description: string;
-
-  @Column({
-    type: DataType.FLOAT,
-    allowNull: false,
-  })
-  declare price: number;
-
-  @Column(DataType.STRING)
-  declare image: string;
+  brand: string | null;
 
   @Column({
     type: DataType.STRING,
-    allowNull: false,
+    allowNull: true,
   })
-  declare category: string;
+  model: string | null;
+
+  @Column({
+    type: DataType.DECIMAL(5, 2),
+    allowNull: true,
+  })
+  discount: number | null;
 }

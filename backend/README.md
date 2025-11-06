@@ -23,7 +23,32 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository with Sequelize ORM and PostgreSQL integration.
+
+## Database Setup
+
+This project uses Sequelize ORM with PostgreSQL. To set up the database connection:
+
+1. **Using Supabase PostgreSQL URL (Recommended):**
+   Create a `.env` file in the project root with your database connection:
+   ```env
+   DATABASE_URL=postgresql://postgres:[YOUR_PASSWORD]@db.qfsgfjyjcxgavsrqbgeu.supabase.co:5432/postgres
+   PORT=3000
+   NODE_ENV=development
+   ```
+
+2. **Using individual environment variables:**
+   ```env
+   DB_HOST=db.qfsgfjyjcxgavsrqbgeu.supabase.co
+   DB_PORT=5432
+   DB_USERNAME=postgres
+   DB_PASSWORD=[YOUR_PASSWORD]
+   DB_DATABASE=postgres
+   PORT=3000
+   NODE_ENV=development
+   ```
+
+Replace `[YOUR_PASSWORD]` with your actual Supabase database password.
 
 ## Project setup
 

@@ -1,31 +1,22 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { SequelizeModule } from '@nestjs/sequelize';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { ConfigModule } from '@nestjs/config';
+import { DatabaseModule } from './database/database.module';
 import { ProductsModule } from './products/products.module';
-import { Product } from './models/product.model';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
     }),
-    SequelizeModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        dialect: 'postgres',
-        host: 'aws-1-ap-southeast-1.pooler.supabase.com',
-        port: 5432,
-        username: 'postgres.qfsgfjyjcxgavsrqbgeu',
-        password: 'sadam@123',
-        database: 'postgres',
-        autoLoadModels: true,
-        synchronize: true,
-        models: [Product],
-      }),
-    }),
-
+    DatabaseModule,
     ProductsModule,
+    UsersModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
