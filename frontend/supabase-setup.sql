@@ -1,8 +1,8 @@
 -- Supabase Database Setup for ShopAdmin
 -- Run this in your Supabase SQL Editor
 
--- Create user_profiles table
-CREATE TABLE IF NOT EXISTS user_profiles (
+-- Create users table
+CREATE TABLE IF NOT EXISTS users (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email TEXT NOT NULL,
   full_name TEXT,
@@ -31,17 +31,17 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 -- Enable Row Level Security (RLS)
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
--- Create policies for user_profiles
-CREATE POLICY "Users can view their own profile" ON user_profiles
+-- Create policies for usersw
+CREATE POLICY "Users can view their own profile" ON users
   FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "Users can update their own profile" ON user_profiles
+CREATE POLICY "Users can update their own profile" ON users
   FOR UPDATE USING (auth.uid() = id);
 
-CREATE POLICY "Users can insert their own profile" ON user_profiles
+CREATE POLICY "Users can insert their own profile" ON users
   FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Create policies for products
@@ -51,7 +51,7 @@ CREATE POLICY "Anyone can view products" ON products
 CREATE POLICY "Only admins can insert products" ON products
   FOR INSERT WITH CHECK (
     EXISTS (
-      SELECT 1 FROM user_profiles 
+      SELECT 1 FROM users 
       WHERE id = auth.uid() AND role = 'admin'
     )
   );
@@ -59,7 +59,7 @@ CREATE POLICY "Only admins can insert products" ON products
 CREATE POLICY "Only admins can update products" ON products
   FOR UPDATE USING (
     EXISTS (
-      SELECT 1 FROM user_profiles 
+      SELECT 1 FROM users 
       WHERE id = auth.uid() AND role = 'admin'
     )
   );
@@ -67,7 +67,7 @@ CREATE POLICY "Only admins can update products" ON products
 CREATE POLICY "Only admins can delete products" ON products
   FOR DELETE USING (
     EXISTS (
-      SELECT 1 FROM user_profiles 
+      SELECT 1 FROM users 
       WHERE id = auth.uid() AND role = 'admin'
     )
   );
@@ -76,7 +76,7 @@ CREATE POLICY "Only admins can delete products" ON products
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO user_profiles (id, email, full_name, avatar_url, role)
+  INSERT INTO users (id, email, full_name, avatar_url, role)
   VALUES (
     NEW.id,
     NEW.email,
@@ -104,8 +104,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers for updated_at
-CREATE TRIGGER update_user_profiles_updated_at
-  BEFORE UPDATE ON user_profiles
+CREATE TRIGGER update_users_updated_at
+      BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_products_updated_at
@@ -114,4 +114,4 @@ CREATE TRIGGER update_products_updated_at
 
 -- Insert sample admin user (you'll need to replace with actual user ID after they sign up)
 -- First, sign up with Google, then get the user ID from auth.users table
--- Then run: UPDATE user_profiles SET role = 'admin' WHERE email = 'your-admin-email@example.com';
+    -- Then run: UPDATE users SET role = 'admin' WHERE email = 'your-admin-email@example.com';

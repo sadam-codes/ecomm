@@ -23,6 +23,12 @@ import { cn } from '../utils/cn'
 
 const UserProfilePage = () => {
   const { userProfile, user, updateUserProfile } = useAuth()
+  const avatarUrl =
+    userProfile?.avatar_url ||
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    null
+  console.log("...........", avatarUrl)
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState({
     full_name: userProfile?.full_name || '',
@@ -68,7 +74,7 @@ const UserProfilePage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <ProfessionalHeader />
-      
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Profile Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -77,10 +83,10 @@ const UserProfilePage = () => {
               <div className="flex items-center space-x-4">
                 <div className="relative">
                   <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center shadow-lg">
-                    {userProfile?.avatar_url ? (
+                    {avatarUrl ? (
                       <img
-                        src={userProfile.avatar_url}
-                        alt={userProfile.full_name}
+                        src={avatarUrl}
+                        alt={userProfile?.full_name || user?.user_metadata?.full_name || 'User avatar'}
                         className="h-20 w-20 rounded-full object-cover"
                       />
                     ) : (
@@ -163,7 +169,7 @@ const UserProfilePage = () => {
                       <p className="text-gray-900">{userProfile?.email || user?.email}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-3">
                     <User className="h-5 w-5 text-gray-400" />
                     <div className="flex-1">
@@ -172,7 +178,7 @@ const UserProfilePage = () => {
                         <input
                           type="text"
                           value={editData.full_name}
-                          onChange={(e) => setEditData({...editData, full_name: e.target.value})}
+                          onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       ) : (
@@ -189,7 +195,7 @@ const UserProfilePage = () => {
                         <input
                           type="tel"
                           value={editData.phone}
-                          onChange={(e) => setEditData({...editData, phone: e.target.value})}
+                          onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       ) : (
@@ -205,7 +211,7 @@ const UserProfilePage = () => {
                       {isEditing ? (
                         <textarea
                           value={editData.address}
-                          onChange={(e) => setEditData({...editData, address: e.target.value})}
+                          onChange={(e) => setEditData({ ...editData, address: e.target.value })}
                           rows={3}
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
@@ -265,7 +271,7 @@ const UserProfilePage = () => {
               {isEditing ? (
                 <textarea
                   value={editData.bio}
-                  onChange={(e) => setEditData({...editData, bio: e.target.value})}
+                  onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
                   rows={4}
                   placeholder="Tell us about yourself..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -320,7 +326,7 @@ const UserProfilePage = () => {
         </div>
       </div>
 
-        <ShortFooter />
+      <ShortFooter />
     </div>
   )
 }

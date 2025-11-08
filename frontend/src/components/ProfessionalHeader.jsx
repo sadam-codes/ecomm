@@ -25,10 +25,16 @@ const ProfessionalHeader = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isThemeOpen, setIsThemeOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const { userProfile, signOut } = useAuth()
+  const { userProfile, user, signOut } = useAuth()
   const { getCartCount, getWishlistCount } = useCart()
   const { theme, updateTheme } = useTheme()
   const navigate = useNavigate()
+
+  const avatarUrl =
+    userProfile?.avatar_url ||
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    null
 
   const handleSignOut = async () => {
     try {
@@ -182,8 +188,17 @@ const ProfessionalHeader = () => {
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center space-x-2 p-2 text-theme-secondary hover:text-primary-600 hover:bg-theme-secondary rounded-lg transition-colors duration-200"
               >
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                  <User className="h-4 w-4 text-white" />
+                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-gradient-to-r from-blue-500 to-purple-500">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={userProfile?.full_name || user?.user_metadata?.full_name || 'User avatar'}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <User className="h-4 w-4 text-white" />
+                  )}
                 </div>
                 <span className="hidden lg:block text-sm font-medium">
                   {userProfile?.full_name || 'User'}

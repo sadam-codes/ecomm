@@ -43,7 +43,7 @@ export class ProductsService {
         brand: createProductDto.brand || null,
         model: createProductDto.model || null,
         discount: createProductDto.discount || null,
-      } as any);
+      });
 
       console.log('Product created successfully:', product.id);
       return product;

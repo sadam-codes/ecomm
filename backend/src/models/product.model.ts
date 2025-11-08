@@ -1,4 +1,17 @@
-import { Table, Column, Model, DataType, BelongsTo, ForeignKey } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  PrimaryKey,
+  AutoIncrement,
+  AllowNull,
+  Default,
+  CreatedAt,
+  UpdatedAt,
+  DeletedAt,
+} from 'sequelize-typescript';
+import { Optional } from 'sequelize';
 
 export enum ProductCategory {
   WATCHES = 'watches',
@@ -11,78 +24,137 @@ export enum ProductStatus {
   OUT_OF_STOCK = 'out_of_stock',
 }
 
+export interface ProductAttributes {
+  id: number;
+  name: string;
+  description: string | null;
+  price: number;
+  stock: number;
+  category: ProductCategory;
+  status: ProductStatus;
+  images: string[] | null;
+  specifications: Record<string, any> | null;
+  brand: string | null;
+  model: string | null;
+  discount: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export type ProductCreationAttributes = Optional<
+  ProductAttributes,
+  | 'id'
+  | 'description'
+  | 'images'
+  | 'specifications'
+  | 'brand'
+  | 'model'
+  | 'discount'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'deletedAt'
+>;
+
 @Table({
   tableName: 'products',
   timestamps: true,
   paranoid: true,
 })
-export class Product extends Model<Product> {
+export class Product
+  extends Model<ProductAttributes, ProductCreationAttributes>
+  implements ProductAttributes
+{
+  @PrimaryKey
+  @AutoIncrement
+  @Column({
+    type: DataType.INTEGER,
+  })
+    declare id: number;
 
+  @AllowNull(false)
   @Column({
     type: DataType.STRING,
-    allowNull: false,
   })
   name: string;
 
+  @AllowNull(true)
   @Column({
     type: DataType.TEXT,
-    allowNull: true,
   })
   description: string | null;
 
+  @AllowNull(false)
   @Column({
     type: DataType.DECIMAL(10, 2),
-    allowNull: false,
   })
   price: number;
 
+  @AllowNull(false)
+  @Default(0)
   @Column({
     type: DataType.INTEGER,
-    allowNull: false,
-    defaultValue: 0,
   })
   stock: number;
 
+  @AllowNull(false)
   @Column({
     type: DataType.ENUM(...Object.values(ProductCategory)),
-    allowNull: false,
   })
   category: ProductCategory;
 
+  @AllowNull(false)
+  @Default(ProductStatus.ACTIVE)
   @Column({
     type: DataType.ENUM(...Object.values(ProductStatus)),
-    allowNull: false,
-    defaultValue: ProductStatus.ACTIVE,
   })
   status: ProductStatus;
 
+  @AllowNull(true)
   @Column({
     type: DataType.JSONB,
-    allowNull: true,
   })
   images: string[] | null;
 
+  @AllowNull(true)
   @Column({
     type: DataType.JSONB,
-    allowNull: true,
   })
   specifications: Record<string, any> | null;
 
+  @AllowNull(true)
   @Column({
     type: DataType.STRING,
-    allowNull: true,
   })
   brand: string | null;
 
+  @AllowNull(true)
   @Column({
     type: DataType.STRING,
-    allowNull: true,
   })
   model: string | null;
 
+  @AllowNull(true)
   @Column({
     type: DataType.DECIMAL(5, 2),
-    allowNull: true,
   })
   discount: number | null;
+
+  @CreatedAt
+  @Column({
+    type: DataType.DATE,
+  })
+  declare createdAt: Date;
+
+  @UpdatedAt
+  @Column({
+    type: DataType.DATE,
+  })
+  declare updatedAt: Date;
+
+  @DeletedAt
+  @Column({
+    type: DataType.DATE,
+  })
+  declare deletedAt: Date | null;
 }

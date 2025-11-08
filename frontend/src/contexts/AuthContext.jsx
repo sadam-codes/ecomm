@@ -17,6 +17,24 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null)
   const [loadingTimeout, setLoadingTimeout] = useState(false)
 
+  const normalizeProfile = (profile, authUser) => {
+    if (!profile) return profile
+    const avatar =
+      profile.avatar_url ||
+      authUser?.user_metadata?.avatar_url ||
+      authUser?.user_metadata?.picture ||
+      null
+
+    if (avatar && profile.avatar_url !== avatar) {
+      return {
+        ...profile,
+        avatar_url: avatar
+      }
+    }
+
+    return profile
+  }
+
   useEffect(() => {
     // Get initial session and load from localStorage
     const initializeAuth = async () => {
@@ -42,7 +60,7 @@ export const AuthProvider = ({ children }) => {
           
           if (session?.user) {
             setUser(session.user)
-            await fetchUserProfile(session.user.id)
+            await fetchUserProfile(session.user.id, session.user)
           } else {
             // Clear localStorage if no session
             try {
@@ -87,7 +105,7 @@ export const AuthProvider = ({ children }) => {
         
         if (session?.user) {
           setLoading(true) // Ensure loading is true while fetching profile
-          await fetchUserProfile(session.user.id)
+          await fetchUserProfile(session.user.id, session.user)
           // Use a small delay to ensure React state updates are processed
           // This prevents race conditions where profile might not be set yet
           await new Promise(resolve => setTimeout(resolve, 50))
@@ -105,10 +123,10 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  const fetchUserProfile = async (userId) => {
+  const fetchUserProfile = async (userId, sessionUser) => {
     try {
       const { data, error } = await supabase
-        .from('user_profiles')
+        .from('users')
         .select('*')
         .eq('id', userId)
         .single()
@@ -120,7 +138,9 @@ export const AuthProvider = ({ children }) => {
 
       if (data) {
         // Check if user should be admin but isn't marked as such
-        const { data: { user: authUser } } = await supabase.auth.getUser()
+        const authUser = sessionUser
+          ? { user_metadata: sessionUser.user_metadata, email: sessionUser.email }
+          : (await supabase.auth.getUser()).data?.user
         if (authUser) {
           const isAdminEmail = authUser.email === 'admin@example.com' || 
                                authUser.email === 'muhammadbinnasir@gmail.com' ||
@@ -130,16 +150,17 @@ export const AuthProvider = ({ children }) => {
           if (isAdminEmail && data.role !== 'admin') {
             // Update user role to admin
             const { data: updatedData, error: updateError } = await supabase
-              .from('user_profiles')
+              .from('users')
               .update({ role: 'admin', updated_at: new Date().toISOString() })
               .eq('id', userId)
               .select()
               .single()
             
             if (!updateError && updatedData) {
-              setUserProfile(updatedData)
+              const normalizedUpdatedData = normalizeProfile(updatedData, authUser)
+              setUserProfile(normalizedUpdatedData)
               try {
-                localStorage.setItem('userProfile', JSON.stringify(updatedData))
+                localStorage.setItem('userProfile', JSON.stringify(normalizedUpdatedData))
               } catch (error) {
                 console.error('Error saving updated userProfile to localStorage:', error)
               }
@@ -148,9 +169,10 @@ export const AuthProvider = ({ children }) => {
           }
         }
         
-        setUserProfile(data)
+        const normalizedData = normalizeProfile(data, authUser)
+        setUserProfile(normalizedData)
         try {
-          localStorage.setItem('userProfile', JSON.stringify(data))
+          localStorage.setItem('userProfile', JSON.stringify(normalizedData))
         } catch (error) {
           console.error('Error saving userProfile to localStorage:', error)
         }
@@ -176,7 +198,7 @@ export const AuthProvider = ({ children }) => {
                            authUser.email?.includes('administrator')
 
       const { data, error } = await supabase
-        .from('user_profiles')
+        .from('users')
         .insert({
           id: userId,
           email: authUser.email,
@@ -194,9 +216,10 @@ export const AuthProvider = ({ children }) => {
         return
       }
 
-      setUserProfile(data)
+      const normalizedData = normalizeProfile(data, authUser)
+      setUserProfile(normalizedData)
       try {
-        localStorage.setItem('userProfile', JSON.stringify(data))
+        localStorage.setItem('userProfile', JSON.stringify(normalizedData))
       } catch (error) {
         console.error('Error saving userProfile to localStorage:', error)
       }
@@ -294,7 +317,7 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const { data, error } = await supabase
-        .from('user_profiles')
+        .from('users')
         .update({
           ...updates,
           updated_at: new Date().toISOString()
