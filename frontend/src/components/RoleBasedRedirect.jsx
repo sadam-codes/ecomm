@@ -45,8 +45,6 @@ const RoleBasedRedirect = () => {
     }
   }
 
-  // Default fallback (should not reach here if properly authenticated)
-  // If we've waited and still no profile, redirect to home
   return <Navigate to="/home" replace />
 }
 

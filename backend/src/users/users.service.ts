@@ -46,11 +46,16 @@ export class UsersService implements OnModuleInit {
     }
   }
 
-  async getAllUsers(filters: { search?: string; status?: string; role?: string }) {
+  async getAllUsers(filters: { search?: string; status?: string; role?: string; page?: number; limit?: number }) {
     try {
       await this.refreshFromSupabase();
 
       const where: any = {};
+      const requestedPage = filters.page ?? 1;
+      const requestedLimit = filters.limit ?? 20;
+      const safeLimit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 20, 1), 100);
+      const safePage = Math.max(Number.isFinite(requestedPage) ? requestedPage : 1, 1);
+      const offset = (safePage - 1) * safeLimit;
 
       if (filters.status) {
         const normalizedStatus = filters.status.toUpperCase() as keyof typeof UserStatus;
@@ -77,11 +82,16 @@ export class UsersService implements OnModuleInit {
       const { rows, count } = await this.userModel.findAndCountAll({
         where,
         order: [['createdAt', 'DESC']],
+        limit: safeLimit,
+        offset,
       });
 
       return {
         users: rows.map(row => row.toJSON()),
         total: count,
+        page: safePage,
+        pageSize: safeLimit,
+        totalPages: count ? Math.ceil(count / safeLimit) : 0,
       };
     } catch (error) {
       throw new Error(`Error fetching users: ${error.message}`);
@@ -132,6 +142,36 @@ export class UsersService implements OnModuleInit {
   async updateUserRole(id: string, updateUserRoleDto: UpdateUserRoleDto) {
     const user = await this.findOne(id);
     await user.update({ role: updateUserRoleDto.role });
+
+    try {
+      const metadataSource = await this.fetchSupabaseUserById(id);
+      const existingAppMetadata = metadataSource?.app_metadata ?? {};
+      const existingUserMetadata = metadataSource?.user_metadata ?? {};
+
+      const { error } = await this.supabaseAdmin.auth.admin.updateUserById(id, {
+        app_metadata: {
+          ...existingAppMetadata,
+          role: updateUserRoleDto.role,
+        },
+        user_metadata: {
+          ...existingUserMetadata,
+          role: updateUserRoleDto.role,
+        },
+      });
+
+      if (error) {
+        this.logger.warn(
+          `Failed to update Supabase metadata for user ${id}: ${error.message}`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Error while syncing Supabase metadata for user ${id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    }
+
     return user.toJSON();
   }
 
@@ -144,6 +184,31 @@ export class UsersService implements OnModuleInit {
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await user.destroy();
+  }
+
+  async resolveUserFromToken(token: string) {
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await this.supabaseAdmin.auth.getUser(token);
+
+      if (error || !data?.user) {
+        this.logger.warn(`Failed to resolve Supabase user from token: ${error?.message ?? 'unknown error'}`);
+        return null;
+      }
+
+      try {
+        return await this.getOrCreateUserById(data.user.id);
+      } catch (innerError) {
+        this.logger.warn(`Failed to resolve application user from token: ${innerError?.message ?? innerError}`);
+        return null;
+      }
+    } catch (error) {
+      this.logger.error('Error resolving user from token', error instanceof Error ? error.stack : undefined);
+      return null;
+    }
   }
 
   private async refreshFromSupabase() {
@@ -190,11 +255,22 @@ export class UsersService implements OnModuleInit {
       return;
     }
 
+    const incomingIds = users.map(user => user.id);
+    const existingUsers = await this.userModel.findAll({
+      where: {
+        id: incomingIds,
+      },
+    });
+    const existingRoleMap = new Map(existingUsers.map(existing => [existing.id, existing.role]));
+
     const upsertPayload = users.map(user => {
       const isActive = user.email_confirmed_at !== null;
       const isAdmin =
         user.app_metadata?.role === 'admin' ||
         user.user_metadata?.role === 'admin';
+
+      const existingRole = existingRoleMap.get(user.id);
+      const resolvedRole = existingRole ?? (isAdmin ? UserRole.ADMIN : UserRole.USER);
 
       return {
         id: user.id,
@@ -205,7 +281,7 @@ export class UsersService implements OnModuleInit {
         phone: user.user_metadata?.phone ?? null,
         address: user.user_metadata?.address ?? null,
         bio: user.user_metadata?.bio ?? null,
-        role: isAdmin ? UserRole.ADMIN : UserRole.USER,
+        role: resolvedRole,
         status: isActive ? UserStatus.ACTIVE : UserStatus.INACTIVE,
         emailConfirmedAt: user.email_confirmed_at ? new Date(user.email_confirmed_at) : null,
         lastSignInAt: user.last_sign_in_at ? new Date(user.last_sign_in_at) : null,
@@ -222,7 +298,6 @@ export class UsersService implements OnModuleInit {
         'phone',
         'address',
         'bio',
-        'role',
         'status',
         'emailConfirmedAt',
         'lastSignInAt',

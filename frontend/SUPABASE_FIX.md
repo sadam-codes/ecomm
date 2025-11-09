@@ -45,7 +45,7 @@ You're getting a `DNS_PROBE_FINISHED_NXDOMAIN` error when trying to authenticate
    - Go to https://supabase.com/dashboard
    - Click "New Project"
    - Choose an organization
-   - Enter project name (e.g., "ShopHub")
+   - Enter project name (e.g., "LuxeMart")
    - Set a database password
    - Select a region
    - Click "Create new project"

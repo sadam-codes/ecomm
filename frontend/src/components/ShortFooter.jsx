@@ -49,7 +49,7 @@ const ShortFooter = () => {
                 S
               </div>
               <div>
-                <p className="text-lg font-semibold">ShopHub</p>
+                <p className="text-lg font-semibold">LuxeMart</p>
                 <p className="text-xs text-slate-400">Luxury marketplace</p>
               </div>
             </div>
@@ -64,7 +64,7 @@ const ShortFooter = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <Mail className="h-4 w-4 text-primary-400" />
-                <span>support@shophub.com</span>
+                <span>support@LuxeMart.com</span>
               </div>
             </div>
             <div className="flex items-center text-sm text-slate-400 space-x-2">
@@ -186,7 +186,7 @@ const ShortFooter = () => {
         {/* Bottom bar */}
         <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-slate-400">
           <div className="flex items-center space-x-1">
-            <span>© {new Date().getFullYear()} ShopHub. Crafted with</span>
+            <span>© {new Date().getFullYear()} LuxeMart. Crafted with</span>
             <Heart className="h-4 w-4 text-rose-400" />
             <span>for style aficionados.</span>
           </div>

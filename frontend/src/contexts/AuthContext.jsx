@@ -96,6 +96,18 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const persistAuthToken = (token) => {
+    try {
+      if (token) {
+        localStorage.setItem('authToken', token)
+      } else {
+        localStorage.removeItem('authToken')
+      }
+    } catch (error) {
+      console.error('Error persisting auth token to localStorage:', error)
+    }
+  }
+
   const clearClientStorage = () => {
     try {
       localStorage.clear()
@@ -161,6 +173,7 @@ export const AuthProvider = ({ children }) => {
           if (session?.user) {
             setUser(session.user)
             persistUserToStorage(session.user)
+            persistAuthToken(session?.access_token)
             await fetchUserProfile(session.user.id, session.user)
           } else {
             // Clear localStorage if no session
@@ -168,6 +181,7 @@ export const AuthProvider = ({ children }) => {
               persistUserToStorage(null)
               localStorage.removeItem('userProfile')
               persistRoleToStorage(null)
+              persistAuthToken(null)
             } catch (error) {
               console.error('Error clearing localStorage:', error)
             }
@@ -205,6 +219,7 @@ export const AuthProvider = ({ children }) => {
       async (event, session) => {
         setUser(session?.user ?? null)
         persistUserToStorage(session?.user ?? null)
+        persistAuthToken(session?.access_token ?? null)
         
         if (session?.user) {
           setLoading(true) // Ensure loading is true while fetching profile
@@ -330,6 +345,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       clearClientStorage()
+      persistAuthToken(null)
 
       console.log('SignOut process completed')
     } catch (error) {
@@ -339,6 +355,7 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(null)
       setLoading(false)
       clearClientStorage()
+      persistAuthToken(null)
     }
   }
 

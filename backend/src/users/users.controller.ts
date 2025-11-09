@@ -22,10 +22,21 @@ export class UsersController {
     @Query('search') search?: string,
     @Query('status') status?: string,
     @Query('role') role?: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '5',
     @Req() req?: Request,
   ) {
-    this.ensureAdmin(req);
-    return this.usersService.getAllUsers({ search, status, role });
+    await this.ensureAdmin(req);
+    const parsedPage = Number(page);
+    const parsedLimit = Number(limit);
+
+    return this.usersService.getAllUsers({
+      search,
+      status,
+      role,
+      page: Number.isFinite(parsedPage) ? parsedPage : 1,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : 20,
+    });
   }
 
   @Get('profile/:id')
@@ -35,7 +46,7 @@ export class UsersController {
 
   @Get(':id')
   async getUser(@Param('id') id: string, @Req() req?: Request) {
-    this.ensureAdmin(req);
+    await this.ensureAdmin(req);
     return this.usersService.getUser(id);
   }
 
@@ -45,7 +56,7 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
     @Req() req?: Request,
   ) {
-    this.ensureAdmin(req);
+    await this.ensureAdmin(req);
     return this.usersService.updateUser(id, updateUserDto);
   }
 
@@ -55,7 +66,7 @@ export class UsersController {
     @Body() updateUserRoleDto: UpdateUserRoleDto,
     @Req() req?: Request,
   ) {
-    this.ensureAdmin(req);
+    await this.ensureAdmin(req);
     return this.usersService.updateUserRole(id, updateUserRoleDto);
   }
 
@@ -65,22 +76,46 @@ export class UsersController {
     @Body() updateUserStatusDto: UpdateUserStatusDto,
     @Req() req?: Request,
   ) {
-    this.ensureAdmin(req);
+    await this.ensureAdmin(req);
     return this.usersService.updateUserStatus(id, updateUserStatusDto);
   }
 
   @Delete(':id')
   async deleteUser(@Param('id') id: string, @Req() req?: Request) {
-    this.ensureAdmin(req);
+    await this.ensureAdmin(req);
     await this.usersService.remove(id);
     return { success: true };
   }
 
-  private ensureAdmin(req?: Request) {
-    const isAdmin = req?.user && req.user.role === 'admin';
-
-    if (!isAdmin) {
+  private async ensureAdmin(req?: Request) {
+    if (!req) {
       throw new UnauthorizedException('Admin access required');
     }
+
+    if (req.user?.role === 'admin') {
+      return;
+    }
+
+    const authHeader = req.headers?.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : null;
+
+    if (!token) {
+      throw new UnauthorizedException('Admin access required');
+    }
+
+    const resolvedUser = await this.usersService.resolveUserFromToken(token);
+
+    if (resolvedUser?.role === 'admin') {
+      req.user = {
+        id: resolvedUser.id,
+        email: resolvedUser.email,
+        role: resolvedUser.role,
+      };
+      return;
+    }
+
+    throw new UnauthorizedException('Admin access required');
   }
 }

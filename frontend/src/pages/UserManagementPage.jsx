@@ -15,29 +15,45 @@ import {
   Clock,
   Trash2,
   ShieldCheck,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { usersApi } from '../api/users'
 import { cn } from '../utils/cn'
 import { showSuccess, showError } from '../utils/toast'
 
+const PAGE_SIZE = 10
+
 const UserManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [page, setPage] = useState(1)
   const [menuOpenUserId, setMenuOpenUserId] = useState(null)
   const [selectedUser, setSelectedUser] = useState(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const createConfirmState = () => ({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Confirm',
+    destructive: false,
+    onConfirm: null
+  })
+  const [confirmDialog, setConfirmDialog] = useState(createConfirmState)
   const dropdownRef = useRef(null)
   const queryClient = useQueryClient()
 
-  const { data: usersData, isLoading, error, refetch } = useQuery({
-    queryKey: ['users', searchTerm, statusFilter, roleFilter],
+  const { data: usersData, isLoading, isFetching, error, refetch } = useQuery({
+    queryKey: ['users', searchTerm, statusFilter, roleFilter, page],
     queryFn: () =>
       usersApi.getUsers({
         search: searchTerm,
         status: statusFilter,
         role: roleFilter,
+        page,
+        limit: PAGE_SIZE,
       }),
     refetchInterval: 30000,
     keepPreviousData: true,
@@ -45,6 +61,11 @@ const UserManagementPage = () => {
 
   const users = usersData?.users || []
   const totalUsers = usersData?.total || users.length
+  const computedTotalPages =
+    totalUsers === 0 ? 1 : Math.max(usersData?.totalPages ?? Math.ceil(totalUsers / PAGE_SIZE), 1)
+  const showPagination = totalUsers > 0 || page > 1
+  const fromRecord = totalUsers === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const toRecord = totalUsers === 0 ? 0 : Math.min(page * PAGE_SIZE, totalUsers)
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -59,6 +80,31 @@ const UserManagementPage = () => {
 
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [menuOpenUserId])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm, statusFilter, roleFilter])
+
+  useEffect(() => {
+    if (!isLoading && usersData) {
+      if (totalUsers === 0 && page !== 1) {
+        setPage(1)
+        return
+      }
+
+      if (page > computedTotalPages) {
+        setPage(computedTotalPages)
+      }
+    }
+  }, [usersData, isLoading, totalUsers, page, computedTotalPages])
+
+  const closeConfirmDialog = () => setConfirmDialog(createConfirmState)
+  const showConfirmDialog = (config) =>
+    setConfirmDialog({
+      ...createConfirmState(),
+      ...config,
+      open: true
+    })
 
   const invalidateUsers = () => {
     queryClient.invalidateQueries({ queryKey: ['users'] })
@@ -177,9 +223,16 @@ const UserManagementPage = () => {
         ? 'This user will be marked as inactive and prevented from signing in. Continue?'
         : 'This user will be reactivated. Continue?'
 
-    if (!window.confirm(message)) return
-
-    statusMutation.mutate({ id: user.id, status: nextStatus })
+    showConfirmDialog({
+      title: nextStatus === 'inactive' ? 'Deactivate User' : 'Activate User',
+      message,
+      confirmLabel: nextStatus === 'inactive' ? 'Deactivate' : 'Activate',
+      destructive: nextStatus === 'inactive',
+      onConfirm: () => {
+        statusMutation.mutate({ id: user.id, status: nextStatus })
+        closeConfirmDialog()
+      }
+    })
   }
 
   const handleToggleRole = (user) => {
@@ -189,16 +242,31 @@ const UserManagementPage = () => {
         ? 'Granting admin access gives full control over the platform. Continue?'
         : 'This user will lose admin privileges. Continue?'
 
-    if (!window.confirm(message)) return
-
-    roleMutation.mutate({ id: user.id, role: nextRole })
     setMenuOpenUserId(null)
+    showConfirmDialog({
+      title: nextRole === 'admin' ? 'Grant Admin Rights' : 'Remove Admin Rights',
+      message,
+      confirmLabel: nextRole === 'admin' ? 'Grant access' : 'Remove access',
+      destructive: nextRole !== 'admin',
+      onConfirm: () => {
+        roleMutation.mutate({ id: user.id, role: nextRole })
+        closeConfirmDialog()
+      }
+    })
   }
 
   const handleDeleteUser = (user) => {
-    if (!window.confirm('This user will be permanently removed. This action cannot be undone. Proceed?')) return
-    deleteMutation.mutate({ id: user.id })
     setMenuOpenUserId(null)
+    showConfirmDialog({
+      title: 'Delete User',
+      message: 'This user will be permanently removed. This action cannot be undone. Proceed?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => {
+        deleteMutation.mutate({ id: user.id })
+        closeConfirmDialog()
+      }
+    })
   }
 
   const handleViewDetails = (user) => {
@@ -261,17 +329,6 @@ const UserManagementPage = () => {
               </div>
             </div>
 
-            <div className="lg:w-48">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
 
             <div className="lg:w-48">
               <select
@@ -290,15 +347,13 @@ const UserManagementPage = () => {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-[1100px] divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Sign In</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -321,7 +376,7 @@ const UserManagementPage = () => {
                       )}
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{user.fullName || 'No name'}</div>
-                        <div className="text-sm text-gray-500">ID: {user.id.slice(0, 8)}...</div>
+                       
                       </div>
                     </div>
                   </td>
@@ -331,39 +386,22 @@ const UserManagementPage = () => {
                       <span className="text-sm text-gray-900 break-all">{user.email}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(user)}</td>
+                
                   <td className="px-6 py-4 whitespace-nowrap">{getRoleBadge(user)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 text-gray-400 mr-2" />
-                      <span className="text-sm text-gray-900">{formatDateTime(user.lastSignInAt)}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 text-gray-400 mr-2" />
-                      <span className="text-sm text-gray-900">{formatDateTime(user.createdAt)}</span>
-                    </div>
-                  </td>
+                 
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => handleViewDetails(user)}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="rounded-lg border border-blue-100 bg-blue-50 p-2 text-blue-600 transition hover:bg-blue-100"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleToggleStatus(user)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                        disabled={isMutating}
-                      >
-                        <Ban className="h-4 w-4" />
-                      </button>
+                     
                       <div className="relative" ref={menuOpenUserId === user.id ? dropdownRef : null}>
                         <button
                           onClick={() => setMenuOpenUserId((prev) => (prev === user.id ? null : user.id))}
-                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                          className="rounded-lg border border-transparent bg-white p-2 text-gray-500 shadow-sm transition hover:border-gray-200 hover:bg-gray-50 hover:text-gray-700"
                           disabled={isMutating}
                         >
                           {isMutating && menuOpenUserId === user.id ? (
@@ -373,23 +411,32 @@ const UserManagementPage = () => {
                           )}
                         </button>
                         {menuOpenUserId === user.id && (
-                          <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
+                          <div
+                            className="absolute right-0 z-20 mt-2 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl ring-1 ring-black/5"
+                            role="menu"
+                          >
+                            <div className="px-4 py-2 border-b border-gray-100">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                Actions
+                              </p>
+                            </div>
                             <button
                               onClick={() => handleToggleRole(user)}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                              className="flex w-full items-center px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
                               disabled={roleMutation.isLoading}
+                              role="menuitem"
                             >
-                              {user.role === 'admin' ? 'Remove admin' : 'Make admin'}
+                              <Crown className="mr-2 h-4 w-4 text-purple-500" />
+                              <span>{user.role === 'admin' ? 'Remove admin rights' : 'Make admin'}</span>
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user)}
-                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              className="flex w-full items-center px-4 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50"
                               disabled={deleteMutation.isLoading}
+                              role="menuitem"
                             >
-                              <div className="flex items-center space-x-2">
-                                <Trash2 className="h-4 w-4" />
-                                <span>Delete user</span>
-                              </div>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete user</span>
                             </button>
                           </div>
                         )}
@@ -403,15 +450,46 @@ const UserManagementPage = () => {
         </div>
 
         {users.length === 0 && (
-          <div className="text-center py-12">
-            <Users className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+          <div className="py-12 text-center">
+            <Users className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+            <h3 className="mb-2 text-lg font-medium text-gray-900">No users found</h3>
             <p className="text-gray-500">
               {searchTerm || statusFilter || roleFilter ? 'Try adjusting your search or filters' : 'No users in the system yet'}
             </p>
           </div>
         )}
       </div>
+
+      {showPagination && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <p className="text-sm text-gray-600">
+            {totalUsers === 0
+              ? 'No users to display'
+              : `Showing ${fromRecord}-${toRecord} of ${totalUsers} users`}
+          </p>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={page === 1 || isFetching || totalUsers === 0}
+              className="inline-flex items-center px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </button>
+            <div className="text-sm font-medium text-gray-700">
+              Page {Math.min(page, computedTotalPages)} of {computedTotalPages}
+            </div>
+            <button
+              onClick={() => setPage((prev) => prev + 1)}
+              disabled={page >= computedTotalPages || isFetching || totalUsers === 0}
+              className="inline-flex items-center px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {isDetailOpen && selectedUser && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
@@ -493,6 +571,41 @@ const UserManagementPage = () => {
                 className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <h3 className="text-lg font-semibold text-gray-900">{confirmDialog.title}</h3>
+              {confirmDialog.message && (
+                <p className="mt-2 text-sm text-gray-600">{confirmDialog.message}</p>
+              )}
+            </div>
+            <div className="flex justify-end space-x-3 px-6 py-4">
+              <button
+                onClick={closeConfirmDialog}
+                className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => confirmDialog.onConfirm?.()}
+                disabled={isMutating}
+                className={cn(
+                  'inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2',
+                  confirmDialog.destructive
+                    ? 'bg-rose-600 hover:bg-rose-500 focus:ring-rose-500'
+                    : 'bg-blue-600 hover:bg-blue-500 focus:ring-blue-500',
+                  isMutating && 'cursor-not-allowed opacity-75'
+                )}
+              >
+                {isMutating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {confirmDialog.confirmLabel || 'Confirm'}
               </button>
             </div>
           </div>
