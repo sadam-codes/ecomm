@@ -161,7 +161,7 @@ const AdminProfilePage = () => {
                       <p className="text-gray-900">{userProfile?.email || user?.email}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-3">
                     <User className="h-5 w-5 text-gray-400" />
                     <div className="flex-1">
@@ -170,7 +170,7 @@ const AdminProfilePage = () => {
                         <input
                           type="text"
                           value={editData.full_name}
-                          onChange={(e) => setEditData({...editData, full_name: e.target.value})}
+                          onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       ) : (
@@ -187,7 +187,7 @@ const AdminProfilePage = () => {
                         <input
                           type="tel"
                           value={editData.phone}
-                          onChange={(e) => setEditData({...editData, phone: e.target.value})}
+                          onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       ) : (
@@ -203,7 +203,7 @@ const AdminProfilePage = () => {
                       {isEditing ? (
                         <textarea
                           value={editData.address}
-                          onChange={(e) => setEditData({...editData, address: e.target.value})}
+                          onChange={(e) => setEditData({ ...editData, address: e.target.value })}
                           rows={3}
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
@@ -263,7 +263,7 @@ const AdminProfilePage = () => {
               {isEditing ? (
                 <textarea
                   value={editData.bio}
-                  onChange={(e) => setEditData({...editData, bio: e.target.value})}
+                  onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
                   rows={4}
                   placeholder="Tell us about yourself..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -286,7 +286,7 @@ const AdminProfilePage = () => {
                     <div className="text-sm text-gray-500">View all users</div>
                   </div>
                 </button>
-                
+
                 <button className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all">
                   <Package className="h-5 w-5 text-green-600 mr-3" />
                   <div className="text-left">
@@ -294,7 +294,7 @@ const AdminProfilePage = () => {
                     <div className="text-sm text-gray-500">Manage inventory</div>
                   </div>
                 </button>
-                
+
                 <button className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all">
                   <BarChart3 className="h-5 w-5 text-purple-600 mr-3" />
                   <div className="text-left">
@@ -302,7 +302,7 @@ const AdminProfilePage = () => {
                     <div className="text-sm text-gray-500">View reports</div>
                   </div>
                 </button>
-                
+
                 <button className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all">
                   <Settings className="h-5 w-5 text-gray-600 mr-3" />
                   <div className="text-left">

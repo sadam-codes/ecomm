@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { usersApi } from '../api/users'
 
 const AuthContext = createContext({})
 
@@ -19,20 +20,106 @@ export const AuthProvider = ({ children }) => {
 
   const normalizeProfile = (profile, authUser) => {
     if (!profile) return profile
-    const avatar =
-      profile.avatar_url ||
-      authUser?.user_metadata?.avatar_url ||
-      authUser?.user_metadata?.picture ||
+
+    const userMetadata = authUser?.user_metadata || {}
+
+    const resolvedFullName =
+      profile.full_name ||
+      profile.fullName ||
+      userMetadata.full_name ||
+      userMetadata.fullName ||
+      userMetadata.name ||
+      profile.email?.split('@')?.[0] ||
       null
 
-    if (avatar && profile.avatar_url !== avatar) {
-      return {
-        ...profile,
-        avatar_url: avatar
+    const resolvedAvatar =
+      profile.avatar_url ||
+      profile.avatarUrl ||
+      userMetadata.avatar_url ||
+      userMetadata.avatarUrl ||
+      userMetadata.picture ||
+      null
+
+    const resolvedRoleRaw =
+      profile.role ||
+      profile.Role ||
+      userMetadata.role ||
+      'user'
+
+    const resolvedRole =
+      typeof resolvedRoleRaw === 'string'
+        ? resolvedRoleRaw.toLowerCase()
+        : 'user'
+
+    const resolvedStatus =
+      profile.status || 
+      profile.Status ||
+      'active'
+
+    const resolvedCreatedAt = profile.created_at || profile.createdAt || null
+    const resolvedUpdatedAt = profile.updated_at || profile.updatedAt || null
+
+    return {
+      ...profile,
+      full_name: resolvedFullName,
+      fullName: resolvedFullName,
+      avatar_url: resolvedAvatar,
+      avatarUrl: resolvedAvatar,
+      role: resolvedRole,
+      status: resolvedStatus,
+      created_at: resolvedCreatedAt,
+      updated_at: resolvedUpdatedAt
+    }
+  }
+
+  const persistUserToStorage = (authUser) => {
+    try {
+      if (authUser) {
+        localStorage.setItem('user', JSON.stringify(authUser))
+      } else {
+        localStorage.removeItem('user')
       }
+    } catch (error) {
+      console.error('Error persisting user to localStorage:', error)
+    }
+  }
+
+  const persistRoleToStorage = (role) => {
+    try {
+      if (role) {
+        localStorage.setItem('role', role)
+      } else {
+        localStorage.removeItem('role')
+      }
+    } catch (error) {
+      console.error('Error persisting role to localStorage:', error)
+    }
+  }
+
+  const clearClientStorage = () => {
+    try {
+      localStorage.clear()
+    } catch (error) {
+      console.error('Error clearing localStorage:', error)
     }
 
-    return profile
+    try {
+      sessionStorage.clear()
+    } catch (error) {
+      console.error('Error clearing sessionStorage:', error)
+    }
+
+    try {
+      if (window?.caches?.keys) {
+        window.caches.keys().then(cacheNames => {
+          cacheNames.forEach(cacheName => {
+            window.caches.delete(cacheName)
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Error clearing caches:', error)
+    }
   }
 
   useEffect(() => {
@@ -43,12 +130,25 @@ export const AuthProvider = ({ children }) => {
         try {
           const savedUser = localStorage.getItem('user')
           const savedProfile = localStorage.getItem('userProfile')
+          const savedRole = localStorage.getItem('role')
           
           if (savedUser) {
-            setUser(JSON.parse(savedUser))
+            const parsedUser = JSON.parse(savedUser)
+            setUser(parsedUser)
+            persistUserToStorage(parsedUser)
           }
           if (savedProfile) {
             setUserProfile(JSON.parse(savedProfile))
+            if (!savedRole) {
+              try {
+                const parsedProfile = JSON.parse(savedProfile)
+                if (parsedProfile?.role) {
+                  persistRoleToStorage(parsedProfile.role)
+                }
+              } catch (error) {
+                console.error('Error parsing saved userProfile for role:', error)
+              }
+            }
           }
         } catch (error) {
           console.error('Error loading from localStorage:', error)
@@ -60,12 +160,14 @@ export const AuthProvider = ({ children }) => {
           
           if (session?.user) {
             setUser(session.user)
+            persistUserToStorage(session.user)
             await fetchUserProfile(session.user.id, session.user)
           } else {
             // Clear localStorage if no session
             try {
-              localStorage.removeItem('user')
+              persistUserToStorage(null)
               localStorage.removeItem('userProfile')
+              persistRoleToStorage(null)
             } catch (error) {
               console.error('Error clearing localStorage:', error)
             }
@@ -102,6 +204,7 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setUser(session?.user ?? null)
+        persistUserToStorage(session?.user ?? null)
         
         if (session?.user) {
           setLoading(true) // Ensure loading is true while fetching profile
@@ -124,107 +227,64 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const fetchUserProfile = async (userId, sessionUser) => {
+    if (!userId) return
+
+    const authUser = sessionUser
+      ? { user_metadata: sessionUser.user_metadata, email: sessionUser.email }
+      : (await supabase.auth.getUser()).data?.user
+
+    let profileData = null
+
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error fetching user profile:', error)
-        return
-      }
-
-      if (data) {
-        // Check if user should be admin but isn't marked as such
-        const authUser = sessionUser
-          ? { user_metadata: sessionUser.user_metadata, email: sessionUser.email }
-          : (await supabase.auth.getUser()).data?.user
-        if (authUser) {
-          const isAdminEmail = authUser.email === 'admin@example.com' || 
-                               authUser.email === 'muhammadbinnasir@gmail.com' ||
-                               authUser.email?.includes('admin') ||
-                               authUser.email?.includes('administrator')
-          
-          if (isAdminEmail && data.role !== 'admin') {
-            // Update user role to admin
-            const { data: updatedData, error: updateError } = await supabase
-              .from('users')
-              .update({ role: 'admin', updated_at: new Date().toISOString() })
-              .eq('id', userId)
-              .select()
-              .single()
-            
-            if (!updateError && updatedData) {
-              const normalizedUpdatedData = normalizeProfile(updatedData, authUser)
-              setUserProfile(normalizedUpdatedData)
-              try {
-                localStorage.setItem('userProfile', JSON.stringify(normalizedUpdatedData))
-              } catch (error) {
-                console.error('Error saving updated userProfile to localStorage:', error)
-              }
-              return
-            }
-          }
-        }
-        
-        const normalizedData = normalizeProfile(data, authUser)
-        setUserProfile(normalizedData)
-        try {
-          localStorage.setItem('userProfile', JSON.stringify(normalizedData))
-        } catch (error) {
-          console.error('Error saving userProfile to localStorage:', error)
-        }
-      } else {
-        // Create user profile if it doesn't exist
-        await createUserProfile(userId)
-      }
+      profileData = await usersApi.getUserProfile(userId, { timeout: 4500 })
     } catch (error) {
-      console.error('Error in fetchUserProfile:', error)
+      console.warn('Backend profile lookup timed out or failed, using fallback profile.', error)
     }
-  }
 
-  const createUserProfile = async (userId) => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      
-      if (!authUser) return
+    if (!profileData) {
+      const fallbackProfileString = localStorage.getItem('userProfile')
 
-      // Check if user should be admin based on email
-      const isAdminEmail = authUser.email === 'admin@example.com' || 
-                           authUser.email === 'muhammadbinnasir@gmail.com' ||
-                           authUser.email?.includes('admin') ||
-                           authUser.email?.includes('administrator')
+      if (fallbackProfileString) {
+        try {
+          const cachedProfile = JSON.parse(fallbackProfileString)
+          const normalizedCached = normalizeProfile(cachedProfile, authUser)
+          setUserProfile(normalizedCached)
+          persistRoleToStorage(normalizedCached?.role)
+          return
+        } catch (parseError) {
+          console.error('Error parsing cached profile from localStorage:', parseError)
+        }
+      }
 
-      const { data, error } = await supabase
-        .from('users')
-        .insert({
+      const fallbackRole = localStorage.getItem('role') || 'user'
+      const minimalProfile = normalizeProfile(
+        {
           id: userId,
-          email: authUser.email,
-          full_name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'User',
-          avatar_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture,
-          role: isAdminEmail ? 'admin' : 'user', // Set role based on email
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single()
+          email: authUser?.email ?? null,
+          role: fallbackRole
+        },
+        authUser
+      )
 
-      if (error) {
-        console.error('Error creating user profile:', error)
-        return
-      }
-
-      const normalizedData = normalizeProfile(data, authUser)
-      setUserProfile(normalizedData)
+      setUserProfile(minimalProfile)
+      persistRoleToStorage(minimalProfile?.role)
       try {
-        localStorage.setItem('userProfile', JSON.stringify(normalizedData))
-      } catch (error) {
-        console.error('Error saving userProfile to localStorage:', error)
+        localStorage.setItem('userProfile', JSON.stringify(minimalProfile))
+      } catch (storageError) {
+        console.error('Error saving fallback userProfile to localStorage:', storageError)
       }
+
+      return
+    }
+
+    const normalizedData = normalizeProfile(profileData, authUser)
+
+    setUserProfile(normalizedData)
+    try {
+      localStorage.setItem('userProfile', JSON.stringify(normalizedData))
+      persistRoleToStorage(normalizedData?.role)
     } catch (error) {
-      console.error('Error in createUserProfile:', error)
+      console.error('Error saving userProfile to localStorage:', error)
     }
   }
 
@@ -262,18 +322,6 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(null)
       setLoading(false)
 
-      // Clear Google session to force account selection
-      try {
-        if (window.gapi && window.gapi.auth2) {
-          const auth2 = window.gapi.auth2.getAuthInstance()
-          if (auth2) {
-            await auth2.signOut()
-          }
-        }
-      } catch (error) {
-        console.log('Google session clear failed:', error)
-      }
-
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut()
       if (error) {
@@ -281,20 +329,7 @@ export const AuthProvider = ({ children }) => {
         // Don't throw error, continue with cleanup
       }
 
-      // Clear ALL localStorage and sessionStorage
-      localStorage.clear()
-      sessionStorage.clear()
-      
-      // Clear any Google-related cookies/localStorage
-      try {
-        Object.keys(localStorage).forEach(key => {
-          if (key.includes('google') || key.includes('gapi') || key.includes('oauth')) {
-            localStorage.removeItem(key)
-          }
-        })
-      } catch (error) {
-        console.log('Error clearing Google-related storage:', error)
-      }
+      clearClientStorage()
 
       console.log('SignOut process completed')
     } catch (error) {
@@ -303,8 +338,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null)
       setUserProfile(null)
       setLoading(false)
-      localStorage.clear()
-      sessionStorage.clear()
+      clearClientStorage()
     }
   }
 
@@ -336,6 +370,11 @@ export const AuthProvider = ({ children }) => {
       try {
         localStorage.setItem('userProfile', JSON.stringify(data))
         console.log('Saved to localStorage')
+        if (data?.role) {
+          localStorage.setItem('role', data.role)
+        } else {
+          localStorage.removeItem('role')
+        }
       } catch (error) {
         console.error('Error saving userProfile to localStorage:', error)
       }

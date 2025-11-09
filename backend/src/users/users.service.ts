@@ -101,6 +101,28 @@ export class UsersService implements OnModuleInit {
     return user.toJSON();
   }
 
+  async getOrCreateUserById(id: string) {
+    let user = await this.userModel.findByPk(id);
+    if (user) {
+      return user.toJSON();
+    }
+
+    const supabaseUser = await this.fetchSupabaseUserById(id);
+
+    if (!supabaseUser) {
+      throw new NotFoundException(`User with id ${id} not found`);
+    }
+
+    await this.syncSupabaseUsers([supabaseUser]);
+
+    user = await this.userModel.findByPk(id);
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found after synchronization`);
+    }
+
+    return user.toJSON();
+  }
+
   async updateUser(id: string, updateUserDto: UpdateUserDto) {
     const user = await this.findOne(id);
     await user.update({ ...updateUserDto, email: updateUserDto.email ?? user.email });
@@ -209,5 +231,16 @@ export class UsersService implements OnModuleInit {
         'updatedAt',
       ],
     });
+  }
+
+  private async fetchSupabaseUserById(id: string) {
+    const { data, error } = await this.supabaseAdmin.auth.admin.getUserById(id);
+
+    if (error) {
+      this.logger.error(`Failed to fetch Supabase user with id ${id}`, error.message);
+      return null;
+    }
+
+    return data?.user ?? null;
   }
 }

@@ -10,6 +10,12 @@ export const usersApi = {
     return apiClient.get(`/users/${id}`)
   },
 
+  getUserProfile: async (id, options = {}) => {
+    const { timeout, ...rest } = options
+    const requestConfig = timeout ? { timeout, ...rest } : { ...rest }
+    return apiClient.get(`/users/profile/${id}`, requestConfig)
+  },
+
   updateUser: async (id, payload) => {
     return apiClient.patch(`/users/${id}`, payload)
   },

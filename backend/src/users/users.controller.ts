@@ -28,6 +28,11 @@ export class UsersController {
     return this.usersService.getAllUsers({ search, status, role });
   }
 
+  @Get('profile/:id')
+  async getUserProfile(@Param('id') id: string) {
+    return this.usersService.getOrCreateUserById(id);
+  }
+
   @Get(':id')
   async getUser(@Param('id') id: string, @Req() req?: Request) {
     this.ensureAdmin(req);
